@@ -107,11 +107,34 @@ class TV4IE(InfoExtractor):
 
         self._sort_formats(formats)
 
+        # Download manifest and extract subtitles. Extracting formats
+        # using this result resulted in an error. This means the
+        # manifest is currently being downloaded twice, which is not
+        # great.
+        res = self._download_webpage_handle(
+            manifest_url, video_id,
+            note='Downloading subtitle information',
+            errnote='Failed to download subtitle information',
+            fatal=True, data=None, headers={}, query={})
+
+        if res:
+            m3u8_doc, urlh = res
+            subtitles = self._parse_m3u8_subtitles(m3u8_doc, manifest_url)
+            # Hardcode webvtt for now
+            for item in subtitles:
+                # List inside dictionary
+                # Modify extension
+                url = subtitles[item][0]['url'].replace('m3u8', 'webvtt')
+                subtitles[item][0]['url'] = url
+                subtitles[item][0]['ext'] = 'vtt'
+        else:
+            subtitles = {}
+
         return {
             'id': video_id,
             'title': title,
             'formats': formats,
-            # 'subtitles': subtitles,
+            'subtitles': subtitles,
             'description': info.get('description'),
             'timestamp': parse_iso8601(info.get('broadcast_date_time')),
             'duration': int_or_none(info.get('duration')),
